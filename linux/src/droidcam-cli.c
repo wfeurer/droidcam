@@ -19,15 +19,27 @@
 #include "connection.h"
 #include "decoder.h"
 
+struct Thread {
+    pthread_t t;
+    int rc;
+    Thread() {
+        rc = -1;
+    }
+};
+
+Thread athread, vthread, dthread;
+
 int v_running = 0;
 int a_running = 0;
 int thread_cmd = 0;
 struct settings g_settings = {0};
 
+
 extern char snd_device[32];
 extern char v4l2_device[32];
 void * AudioThreadProc(void * args);
 void * VideoThreadProc(void * args);
+void * DecodeThreadProc(void * args);
 
 void sig_handler(int sig) {
     a_running = 0;
@@ -152,9 +164,6 @@ void wait_command() {
 }
 
 int main(int argc, char *argv[]) {
-    pthread_t athread, vthread;
-    int athread_rc = -1, vthread_rc = -1;
-
     parse_args(argc, argv);
 
     if (!decoder_init()) {
@@ -176,7 +185,8 @@ int main(int argc, char *argv[]) {
                 return 0;
             }
         }
-        vthread_rc = pthread_create(&vthread, NULL, VideoThreadProc, (void*) (SOCKET_PTR) videoSocket);
+        vthread.rc = pthread_create(&vthread.t, NULL, VideoThreadProc, (void*) (SOCKET_PTR) videoSocket);
+        dthread.rc = pthread_create(&dthread.t, NULL, DecodeThreadProc, NULL);
     }
 
     if (a_running){
@@ -184,7 +194,7 @@ int main(int argc, char *argv[]) {
         if (!v_running && g_settings.connection == CB_RADIO_ADB && CheckAdbDevices(g_settings.port) != 8)
             return 1;
 
-        athread_rc = pthread_create(&athread, NULL, AudioThreadProc, NULL);
+        athread.rc = pthread_create(&athread.t, NULL, AudioThreadProc, NULL);
     }
 
     signal(SIGINT, sig_handler);
@@ -195,8 +205,9 @@ int main(int argc, char *argv[]) {
 
     dbgprint("joining\n");
     sig_handler(SIGHUP);
-    if (athread_rc == 0) pthread_join(athread, NULL);
-    if (vthread_rc == 0) pthread_join(vthread, NULL);
+    if (athread.rc == 0) pthread_join(athread.t, NULL);
+    if (vthread.rc == 0) pthread_join(vthread.t, NULL);
+    if (dthread.rc == 0) pthread_join(dthread.t, NULL);
     decoder_fini();
     dbgprint("exit\n");
     return 0;

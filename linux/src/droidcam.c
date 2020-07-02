@@ -27,6 +27,7 @@ GtkEntry * portEntry;
 GtkButton *start_button;
 GThread* hVideoThread;
 GThread* hAudioThread;
+GThread* hDecodeThread;
 
 int a_running = 0;
 int v_running = 0;
@@ -38,6 +39,7 @@ extern char v4l2_device[32];
 
 void * AudioThreadProc(void * args);
 void * VideoThreadProc(void * args);
+void * DecodeThreadProc(void * args);
 
 /* Helper Functions */
 char title[256];
@@ -72,6 +74,10 @@ static void Stop(void)
 		g_thread_join(hAudioThread);
 		hAudioThread = NULL;
 	}
+	if (hDecodeThread) {
+		g_thread_join(hDecodeThread);
+		hDecodeThread = NULL;
+	}
 }
 
 static void Start(void)
@@ -86,7 +92,9 @@ static void Start(void)
 	}
 
 	if (g_settings.connection == CB_WIFI_SRVR) {
+		v_running = 1;
 		hVideoThread = g_thread_new(NULL, VideoThreadProc, (void*) (SOCKET_PTR) s);
+		hDecodeThread = g_thread_new(NULL, DecodeThreadProc, NULL);
 		goto EARLY_OUT;
 	}
 
@@ -123,7 +131,9 @@ static void Start(void)
 	g_settings.port = port;
 
 	if (g_settings.video) {
+		v_running = 1;
 		hVideoThread = g_thread_new(NULL, VideoThreadProc, (void*) (SOCKET_PTR) s);
+		hDecodeThread = g_thread_new(NULL, DecodeThreadProc, NULL);
 	} else {
 		disconnect(s);
 	}
