@@ -15,6 +15,7 @@ CC    = -std=c++11 -x c++ -Wall -fPIC -no-pie
 GTK   = `pkg-config --libs --cflags gtk+-3.0` `pkg-config --libs x11`
 LIBAV = `pkg-config --libs --cflags libswscale libavutil`
 LIBS  =  -lspeex -lasound -lpthread -lm
+LIBS +=  -lusbmuxd
 JPEG  = -I$(JPEG_INCLUDE) $(JPEG_LIB)/libturbojpeg.a
 SRC      = src/connection.c src/settings.c src/decoder*.c src/av.c src/usb.c
 
@@ -22,12 +23,8 @@ all: droidcam-cli droidcam
 
 ifeq "$(RELEASE)" "1"
 LIBAV = /usr/lib/x86_64-linux-gnu/libswscale.a /usr/lib/x86_64-linux-gnu/libavutil.a
-LIBS += /usr/lib/x86_64-linux-gnu/libusbmuxd.a
 package: clean all
 	zip -x *.png src/ src/* Makefile -r droidcam_`date +%s`.zip ./*
-
-else
-LIBS += -lusbmuxd
 
 endif
 

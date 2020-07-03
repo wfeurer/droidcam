@@ -23,6 +23,7 @@ libswscale-dev
 libasound2-dev
 libspeex-dev
 libusbmuxd-dev
+libplist-dev
 ```
 
 Run `make`
