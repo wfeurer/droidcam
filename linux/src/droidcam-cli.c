@@ -62,9 +62,15 @@ static inline void usage(int argc, char *argv[]) {
     " %s [-a] [-v] adb <port>\n"
     "   Connect via adb with audio and/or video\n"
     "\n"
+    " %s [-a] [-v] ios <port>\n"
+    "   Connect via usbmuxd with audio and/or video\n"
+    "\n"
     "Input '?' for list of commands while streaming.\n"
     ,
-    argv[0], argv[0], argv[0]);
+    argv[0],
+    argv[0],
+    argv[0],
+    argv[0]);
 }
 
 static void parse_args(int argc, char *argv[]) {
@@ -97,6 +103,9 @@ static void parse_args(int argc, char *argv[]) {
         if (strcmp(g_settings.ip, "adb") == 0) {
             strcpy(g_settings.ip, ADB_LOCALHOST_IP);
             g_settings.connection = CB_RADIO_ADB;
+        }
+        else if (strcmp(g_settings.ip, "ios") == 0) {
+            g_settings.connection = CB_RADIO_IOS;
         }
         else {
             g_settings.connection = CB_RADIO_WIFI;
@@ -174,15 +183,21 @@ int main(int argc, char *argv[]) {
     if (v_running) {
         printf("Video: %s\n", v4l2_device);
         SOCKET videoSocket = INVALID_SOCKET;
-        if (g_settings.connection == CB_RADIO_WIFI || g_settings.connection == CB_RADIO_ADB) {
+        if (g_settings.connection == CB_RADIO_WIFI || g_settings.connection == CB_RADIO_ADB || g_settings.connection == CB_RADIO_IOS) {
 
-            if (g_settings.connection == CB_RADIO_ADB && CheckAdbDevices(g_settings.port) != 8)
+            if (g_settings.connection == CB_RADIO_ADB && CheckAdbDevices(g_settings.port) < 0)
                 return 1;
 
-            videoSocket = Connect(g_settings.ip, g_settings.port);
-            if (videoSocket == INVALID_SOCKET) {
-                errprint("Video: Connect failed to %s:%d\n", g_settings.ip, g_settings.port);
-                return 0;
+            if (g_settings.connection == CB_RADIO_IOS) {
+                if ((videoSocket = CheckiOSDevices(g_settings.port)) <= 0)
+                    return 1;
+            }
+            else {
+                videoSocket = Connect(g_settings.ip, g_settings.port);
+                if (videoSocket == INVALID_SOCKET) {
+                    errprint("Video: Connect failed to %s:%d\n", g_settings.ip, g_settings.port);
+                    return 0;
+                }
             }
         }
         vthread.rc = pthread_create(&vthread.t, NULL, VideoThreadProc, (void*) (SOCKET_PTR) videoSocket);
@@ -191,8 +206,10 @@ int main(int argc, char *argv[]) {
 
     if (a_running){
         printf("Audio: %s\n", snd_device);
-        if (!v_running && g_settings.connection == CB_RADIO_ADB && CheckAdbDevices(g_settings.port) != 8)
-            return 1;
+        if (!v_running) {
+            if (g_settings.connection == CB_RADIO_ADB && CheckAdbDevices(g_settings.port) != 0)
+                return 1;
+        }
 
         athread.rc = pthread_create(&athread.t, NULL, AudioThreadProc, NULL);
     }

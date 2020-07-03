@@ -107,6 +107,8 @@ void *AudioThreadProc(void *arg) {
         return 0;
     }
 
+    if (g_settings.connection == CB_RADIO_IOS)
+        goto TCP_ONLY;
     if (strncmp(g_settings.ip, ADB_LOCALHOST_IP, CSTR_LEN(ADB_LOCALHOST_IP)) == 0)
         goto TCP_ONLY;
 
@@ -132,7 +134,13 @@ void *AudioThreadProc(void *arg) {
 TCP_ONLY:
     dbgprint("UDP didnt work, trying TCP\n");
     mode = TCP_STREAM;
-    socket = Connect(g_settings.ip, g_settings.port);
+    if (g_settings.connection == CB_RADIO_IOS) {
+        socket = CheckiOSDevices(g_settings.port);
+        if (socket <= 0) socket = INVALID_SOCKET;
+    } else {
+        socket = Connect(g_settings.ip, g_settings.port);
+    }
+
     if (socket == INVALID_SOCKET) {
         errprint("Audio: Connect failed to %s:%d\n", g_settings.ip, g_settings.port);
         return 0;
